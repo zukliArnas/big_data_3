@@ -21,9 +21,15 @@ def insert_chunk(chunk_df):
     db = client["ais"]
     collection = db["records"]
 
-    records = chunk_df.to_dict(orient="records")
-    collection.insert_many(records)
-    client.close()
+    try:
+        records = chunk_df.to_dict(orient="records")
+        collection.insert_many(records)
+        logger.info(f"✅ Inserted chunk of {len(records)}")
+    except Exception as e:
+        logger.error(f"❌ Chunk failed: {e}")
+        time.sleep(2)  # Wait before retrying
+    finally:
+        client.close()
 
 def main():
     logger.info("Loading and cleaning data")
