@@ -1,0 +1,21 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore virtual environment
+venv/
+
+# Ignore log files
+*.log
+
+# Ignore extracted data and raw files
+ais_dataset/
+*.zip
+
+# VSCode settings (optional)
+.vscode/
+
+# OS-specific
+.DS_Store
+
+/ais_dataset
