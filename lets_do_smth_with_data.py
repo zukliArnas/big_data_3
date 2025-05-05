@@ -46,10 +46,10 @@ def main():
     df.rename(columns={"# Timestamp": "Timestamp"}, inplace=True)
     df = df[["MMSI", "Timestamp", "Latitude", "Longitude", "SOG", "COG"]]
     df = df.dropna(subset=["MMSI", "Timestamp", "Latitude", "Longitude"])
-    df = df.head(50000)  # just for testing
+    # df = df.head(50000)  # just for testing
 
     total_rows = len(df)
-    # logger.info(f"After cleaning left rows: {total_rows}")
+    logger.info(f"After cleaning left rows: {total_rows}")
 
     chunks = math.ceil(total_rows / CHUNK_SIZE)
     with ThreadPoolExecutor(max_workers=NUM_THREADS) as ex:
