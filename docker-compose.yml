@@ -1,0 +1,25 @@
+services:
+  configsvr:
+    image: mongo:6
+    command: mongod --configsvr --replSet configReplSet --port 27019
+    ports:
+      - 27019:27019
+    volumes:
+      - ./data/configdb:/data/db
+
+  shard1:
+    image: mongo:6
+    command: mongod --shardsvr --replSet shard1ReplSet --port 27018
+    ports:
+      - 27018:27018
+    volumes:
+      - ./data/shard1:/data/db
+
+  mongos:
+    image: mongo:6
+    command: mongos --configdb configReplSet/configsvr:27019
+    ports:
+      - 27017:27017
+    depends_on:
+      - configsvr
+      - shard1
