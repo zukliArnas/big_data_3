@@ -17,7 +17,7 @@ services:
 
   mongos:
     image: mongo:6
-    command: mongos --configdb configReplSet/configsvr:27019
+    command: mongos --configdb configReplSet/configsvr:27019 --bind_ip_all
     ports:
       - 27017:27017
     depends_on:

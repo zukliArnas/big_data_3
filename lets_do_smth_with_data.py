@@ -4,32 +4,37 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
-from pymongo import MongoClient
+import pymongo
 from tqdm import tqdm
 
 from logger_config import get_logger
 
 
 CSV_PATH = "/Users/arnas/big_data_3/big_data_3/ais_dataset/aisdk-2025-04-20/aisdk-2025-04-20.csv"
-CHUNK_SIZE = 5000
-NUM_THREADS = 2
+NUM_THREADS = 1
+CHUNK_SIZE = 2000
 
 logger = get_logger("task.log")
 
 def insert_chunk(chunk_df):
-    client = MongoClient("mongodb://localhost:27017")
+    client = pymongo.MongoClient("mongodb://localhost:27017")
     db = client["ais"]
     collection = db["records"]
+    records = chunk_df.to_dict(orient="records")
 
-    try:
-        records = chunk_df.to_dict(orient="records")
-        collection.insert_many(records)
-        logger.info(f"Inserted chunk of {len(records)}")
-    except Exception as e:
-        logger.error(f"Chunk failed: {e}")
-        time.sleep(2)  # Wait before retrying
-    finally:
-        client.close()
+    for attempt in range(3):
+        try:
+            collection.insert_many(records, ordered=False)
+            logger.info(f"Inserted chunk of {len(records)}")
+            break
+        except pymongo.errors.PyMongoError as e:
+            logger.error(f"Attempt {attempt + 1} failed: {e}")
+            time.sleep(2 * (attempt + 1))
+    else:
+        logger.error("Final attempt failed. Giving up.")
+
+    client.close()
+
 
 def main():
     logger.info("Loading and cleaning data")
@@ -41,9 +46,10 @@ def main():
     df.rename(columns={"# Timestamp": "Timestamp"}, inplace=True)
     df = df[["MMSI", "Timestamp", "Latitude", "Longitude", "SOG", "COG"]]
     df = df.dropna(subset=["MMSI", "Timestamp", "Latitude", "Longitude"])
+    df = df.head(50000)  # just for testing
 
     total_rows = len(df)
-    logger.info(f"After cleaning left rows: {total_rows}")
+    # logger.info(f"After cleaning left rows: {total_rows}")
 
     chunks = math.ceil(total_rows / CHUNK_SIZE)
     with ThreadPoolExecutor(max_workers=NUM_THREADS) as ex:
@@ -53,6 +59,7 @@ def main():
             end = min(start + CHUNK_SIZE, total_rows)
             chunk_df = df.iloc[start:end]
             futures.append(ex.submit(insert_chunk, chunk_df))
+            time.sleep(0.1)
 
         for f in futures:
             f.result()
