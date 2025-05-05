@@ -19,3 +19,5 @@ ais_dataset/
 .DS_Store
 
 /ais_dataset
+data/
+

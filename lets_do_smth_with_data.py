@@ -11,8 +11,8 @@ from logger_config import get_logger
 
 
 CSV_PATH = "/Users/arnas/big_data_3/big_data_3/ais_dataset/aisdk-2025-04-20/aisdk-2025-04-20.csv"
-CHUNK_SIZE = 10000
-NUM_THREADS = 4
+CHUNK_SIZE = 5000
+NUM_THREADS = 2
 
 logger = get_logger("task.log")
 
@@ -24,9 +24,9 @@ def insert_chunk(chunk_df):
     try:
         records = chunk_df.to_dict(orient="records")
         collection.insert_many(records)
-        logger.info(f"✅ Inserted chunk of {len(records)}")
+        logger.info(f"Inserted chunk of {len(records)}")
     except Exception as e:
-        logger.error(f"❌ Chunk failed: {e}")
+        logger.error(f"Chunk failed: {e}")
         time.sleep(2)  # Wait before retrying
     finally:
         client.close()
@@ -40,7 +40,7 @@ def main():
 
     df.rename(columns={"# Timestamp": "Timestamp"}, inplace=True)
     df = df[["MMSI", "Timestamp", "Latitude", "Longitude", "SOG", "COG"]]
-    df.dropna(subset=["MMSI", "Timestamp", "Latitude", "Longitude"])
+    df = df.dropna(subset=["MMSI", "Timestamp", "Latitude", "Longitude"])
 
     total_rows = len(df)
     logger.info(f"After cleaning left rows: {total_rows}")
