@@ -1,6 +1,5 @@
 import math
 import time
-
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
@@ -9,10 +8,9 @@ from tqdm import tqdm
 
 from logger_config import get_logger
 
-
 CSV_PATH = "/Users/arnas/big_data_3/big_data_3/ais_dataset/aisdk-2025-04-20/aisdk-2025-04-20.csv"
-NUM_THREADS = 1
-CHUNK_SIZE = 2000
+NUM_THREADS = 2
+CHUNK_SIZE = 5000
 
 logger = get_logger("task.log")
 
@@ -40,18 +38,17 @@ def main():
     logger.info("Loading and cleaning data")
     df = pd.read_csv(CSV_PATH)
 
-    logger.info(f"Total rows: {len(df)}")
-    logger.info(f"Doing cleaning")
-
+    # Rename the timestamp column
     df.rename(columns={"# Timestamp": "Timestamp"}, inplace=True)
-    df = df[["MMSI", "Timestamp", "Latitude", "Longitude", "SOG", "COG"]]
+
+    # Drop rows missing the most essential fields for filtering and analysis
     df = df.dropna(subset=["MMSI", "Timestamp", "Latitude", "Longitude"])
-    # df = df.head(50000)  # just for testing
+
+    logger.info(f"Total rows after cleaning: {len(df)}")
 
     total_rows = len(df)
-    logger.info(f"After cleaning left rows: {total_rows}")
-
     chunks = math.ceil(total_rows / CHUNK_SIZE)
+
     with ThreadPoolExecutor(max_workers=NUM_THREADS) as ex:
         futures = []
         for i in tqdm(range(chunks), desc="Inserting chunks"):
@@ -64,7 +61,7 @@ def main():
         for f in futures:
             f.result()
 
-    print("Data was inserted succesfully.")
+    print("Data was inserted successfully.")
 
 if __name__ == "__main__":
     start_time = time.time()
