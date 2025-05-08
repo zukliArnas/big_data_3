@@ -19,11 +19,14 @@ def get_logger(log_file: str = "task.log") -> logging.Logger:
     }
 
     color_formatter = colorlog.ColoredFormatter(
-        "%(blue)s%(asctime)s%(reset)s - %(log_color)s%(levelname)s%(reset)s - %(message)s",
+        "%(blue)s%(asctime)s%(reset)s - %(log_color)s%(levelname)s%(reset)s - "
+        "%(cyan)s%(funcName)s()%(reset)s - %(message)s",
         log_colors=log_colors
     )
 
-    file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(funcName)s() - %(message)s"
+    )
 
     stdout_handle = logging.StreamHandler(sys.stdout)
     stdout_handle.setFormatter(color_formatter)
