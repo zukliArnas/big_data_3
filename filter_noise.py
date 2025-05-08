@@ -1,15 +1,22 @@
-import pymongo
-from multiprocessing import Pool, cpu_count
-from tqdm import tqdm
-import numpy as np
-import time
 import math
+import time
+import pymongo
+import numpy as np
 
+from multiprocessing import Pool, cpu_count
+from pymongo import MongoClient
+from pymongo.errors import PyMongoError
+from tqdm import tqdm
+from typing import List, Any
 
 from logger_config import get_logger
 
 
-REQUIRED_FIELDS = ["MMSI", "Navigational status", "Latitude", "Longitude", "ROT", "SOG", "COG", "Heading"]
+REQUIRED_FIELDS = [
+    "MMSI", "Navigational status", "Latitude", "Longitude",
+    "ROT", "SOG", "COG", "Heading"
+]
+
 BATCH_SIZE = 5000
 CHUNK_SIZE = 500
 NUM_PROCESSES = max(cpu_count() - 1, 1)
@@ -17,49 +24,50 @@ BULK_WRITE_SIZE = 1000
 
 logger = get_logger("task.log")
 
-def get_client():
-    """Create a MongoDB client with optimized settings"""
+
+def get_client() -> MongoClient:
+    """Create and return a configured MongoDB client."""
     return pymongo.MongoClient(
         "mongodb://localhost:27017",
-        maxPoolSize=200,                # Increased connection pool size
-        connectTimeoutMS=30000,         # Longer connect timeout
-        socketTimeoutMS=45000,          # Longer socket timeout
-        waitQueueTimeoutMS=30000,       # Longer queue timeout
-        retryWrites=True,               # Automatic retry of write operations
-        w=1                             # Acknowledge writes immediately for speed
+        maxPoolSize=200,
+        connectTimeoutMS=30000,
+        socketTimeoutMS=45000,
+        waitQueueTimeoutMS=30000,
+        retryWrites=True,
+        w=1
     )
 
-def init_worker():
-    """Initialize worker process with its own MongoDB client"""
+def init_worker() -> None:
+    """Worker initializer to create a global MongoDB client per process."""
     global client
     client = get_client()
 
 
-def is_valid_entry(entry):
+def is_valid_entry(entry: dict) -> bool:
+    """Check whether an entry is valid based on required fields."""
     for field in REQUIRED_FIELDS:
         if field not in entry:
             return False
         value = entry[field]
-        if value in [None, "", -1]:
-            return False
-        if isinstance(value, float) and math.isnan(value):
+        if value in [None, "", -1] or (isinstance(value, float) and math.isnan(value)):
             return False
     return True
 
 
-def process_mmsi_chunk(mmsi_chunk):
-
+def process_mmsi_chunk(mmsi_chunk: List[Any]) -> int:
+    """Filter and insert valid records for a chunk of MMSI values."""
     global client
     db = client["ais"]
     raw = db["records"]
     clean_records = []
     inserted_count = 0
+
     for mmsi in mmsi_chunk:
-        cursor = raw.find({"MMSI": mmsi},
-            projection={field: 1 for field in REQUIRED_FIELDS + ["_id"]},
+        cursor = raw.find(
+            {"MMSI": mmsi},
+            projection={field: 1 for field in REQUIRED_FIELDS + ["_id", "Timestamp"]},
             batch_size=BATCH_SIZE
         )
-
         entries = list(cursor)
         if len(entries) < 100:
             logger.debug(f"Skipping MMSI {mmsi} with only {len(entries)} entries")
@@ -86,14 +94,15 @@ def process_mmsi_chunk(mmsi_chunk):
 
     return inserted_count
 
-def chunk_list(lst, n):
+
+def chunk_list(lst: List[Any], n: int) -> List[List[Any]]:
     """Split a list into n roughly equal chunks"""
     k, m = divmod(len(lst), n)
     return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
 
 
-def prepare_database():
-    """Prepare the database - create indexes on the raw data to speed up queries"""
+def prepare_database() -> List[Any]:
+    """Drop old clean data, index raw data, and fetch shuffled MMSIs."""
     client = get_client()
     db = client["ais"]
 
@@ -115,13 +124,13 @@ def prepare_database():
     return mmsi_list
 
 
-def main():
+def main() -> bool:
     start_time = time.time()
+
     mmsi_list = prepare_database()
     logger.info(f"Found {len(mmsi_list)} MMSIs. Starting parallel processing...")
 
-    num_chunks = NUM_PROCESSES * 4  # Create more chunks than processes for better load balancing
-    mmsi_chunks = chunk_list(mmsi_list, num_chunks)
+    mmsi_chunks = chunk_list(mmsi_list, NUM_PROCESSES * 4)
 
     # Process in parallel
     with Pool(processes=NUM_PROCESSES, initializer=init_worker) as pool:
@@ -137,17 +146,15 @@ def main():
     # Create indexes after data is inserted
     client = get_client()
     db = client["ais"]
-    logger.info("Creating indexes on clean data...")
 
-    # Create compound indexes for common query patterns
+    logger.info("Creating indexes on clean data...")
     db["ais_clean"].create_index([("MMSI", pymongo.ASCENDING)])
     db["ais_clean"].create_index([("MMSI", pymongo.ASCENDING), ("Timestamp", pymongo.ASCENDING)])
-
     client.close()
 
     elapsed_time = time.time() - start_time
     logger.info(f"Clean data is ready in 'ais_clean' collection. Total time: {elapsed_time:.2f} seconds")
-
+    return True
 
 if __name__ == "__main__":
     main()

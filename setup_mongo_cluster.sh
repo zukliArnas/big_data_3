@@ -54,4 +54,4 @@ docker exec -i big_data_3-mongos-1 mongosh --quiet --eval "sh.status().shards" |
   && echo "Shard successfully added to the cluster" \
   || echo "Shard was NOT added to the cluster"
 
-echo "🎉 All done!"
+echo "Done!"
