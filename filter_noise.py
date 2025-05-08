@@ -156,5 +156,7 @@ def main() -> bool:
     logger.info(f"Clean data is ready in 'ais_clean' collection. Total time: {elapsed_time:.2f} seconds")
     return True
 
+
 if __name__ == "__main__":
-    main()
+    success = main()
+    print("Data filtering completed successfully." if success else "Filtering failed.")
