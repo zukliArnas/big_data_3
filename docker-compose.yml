@@ -1,6 +1,7 @@
 version: '3.8'
 services:
   configsvr:
+    container_name: configsvr
     image: mongo:6.0
     command: ["mongod", "--configsvr", "--replSet", "configReplSet", "--port", "27019"]
     ports:
@@ -9,24 +10,56 @@ services:
       - ./data/configdb:/data/db
     networks:
       - mongo-cluster
+    hostname: configsvr
 
-  shard1:
+  shard1-1:
+    container_name: shard1-1
     image: mongo:6.0
     command: ["mongod", "--shardsvr", "--replSet", "shardReplSet", "--port", "27018"]
     ports:
       - "27018:27018"
     volumes:
-      - ./data/shard1:/data/db
+      - ./data/shard1-1:/data/db
     networks:
       - mongo-cluster
+    hostname: shard1-1
+
+  shard1-2:
+    container_name: shard1-2
+    image: mongo:6.0
+    command: ["mongod", "--shardsvr", "--replSet", "shardReplSet", "--port", "27020"]
+    ports:
+      - "27020:27020"
+    volumes:
+      - ./data/shard1-2:/data/db
+    networks:
+      - mongo-cluster
+    hostname: shard1-2
+
+  shard1-arbiter:
+    container_name: shard-arbiter
+    image: mongo:6.0
+    command: ["mongod", "--shardsvr", "--replSet", "shardReplSet", "--port", "27021"]
+    ports:
+      - 27021:27021
+    networks:
+      - mongo-cluster
+    hostname: shard-arbiter
+
 
   mongos:
+    container_name: mongos
     image: mongo:6.0
     command: ["mongos", "--configdb", "configReplSet/configsvr:27019", "--bind_ip_all"]
     ports:
       - "27017:27017"
+    depends_on:
+      - configsvr
+      - shard1-1
+      - shard1-2
     networks:
       - mongo-cluster
+    hostname: mongos
 
 networks:
   mongo-cluster:
